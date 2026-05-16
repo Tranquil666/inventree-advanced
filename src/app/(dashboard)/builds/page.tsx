@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import { PaginationControls } from '@/components/ui/pagination-controls'
 import { toast } from 'sonner'
 
 const STATUS_STYLES: Record<string, string> = {
@@ -29,22 +30,42 @@ interface BuildOrder {
   part: { name: string; unit: string }
 }
 
+interface BuildsResponse {
+  data: BuildOrder[]
+  total: number
+  page: number
+  limit: number
+}
+
 interface Part { id: string; name: string; unit: string }
+
+interface PartsResponse {
+  data: Part[]
+  total: number
+  page: number
+  limit: number
+}
 
 export default function BuildsPage() {
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ partId: 'none', quantity: '1', reference: '', notes: '' })
+  const [page, setPage] = useState(1)
+  const limit = 50
 
-  const { data: builds = [], isLoading } = useQuery<BuildOrder[]>({
-    queryKey: ['builds'],
-    queryFn: () => fetch('/api/builds').then((r) => r.json()),
+  const { data: buildsResponse, isLoading } = useQuery<BuildsResponse>({
+    queryKey: ['builds', page],
+    queryFn: () => fetch(`/api/builds?page=${page}&limit=${limit}`).then((r) => r.json()),
   })
 
-  const { data: parts = [] } = useQuery<Part[]>({
+  const builds = buildsResponse?.data ?? []
+  const total = buildsResponse?.total ?? 0
+
+  const { data: partsResponse } = useQuery<PartsResponse>({
     queryKey: ['parts'],
-    queryFn: () => fetch('/api/parts').then((r) => r.json()),
+    queryFn: () => fetch('/api/parts?limit=200').then((r) => r.json()),
   })
+  const parts = partsResponse?.data ?? []
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -73,55 +94,63 @@ export default function BuildsPage() {
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Build Orders</h1>
-          <p className="text-slate-500 text-sm mt-1">{builds.length} builds</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Build Orders</h1>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">{total} builds</p>
         </div>
         <Button onClick={() => { setForm({ partId: 'none', quantity: '1', reference: '', notes: '' }); setOpen(true) }} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
           <Plus className="w-4 h-4" /> New Build
         </Button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-100 bg-slate-50">
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Reference</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Part</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Target Qty</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Created</th>
+            <tr className="border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Reference</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Part</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Target Qty</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Status</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Created</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-50">
+          <tbody className="divide-y divide-slate-50 dark:divide-slate-700/50">
             {isLoading
               ? [...Array(4)].map((_, i) => (
                   <tr key={i}>{[...Array(5)].map((__, j) => <td key={j} className="px-5 py-3"><Skeleton className="h-4 w-full" /></td>)}</tr>
                 ))
               : builds.map((b) => (
-                  <tr key={b.id} className="hover:bg-slate-50">
+                  <tr key={b.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
                     <td className="px-5 py-3">
-                      <Link href={`/builds/${b.id}`} className="font-medium text-slate-800 hover:text-indigo-600">
+                      <Link href={`/builds/${b.id}`} className="font-medium text-slate-800 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400">
                         {b.reference ?? `BUILD-${b.id.slice(0, 8).toUpperCase()}`}
                       </Link>
                     </td>
-                    <td className="px-5 py-3 text-slate-600">{b.part.name}</td>
-                    <td className="px-5 py-3 text-slate-600">{b.quantity} {b.part.unit}</td>
+                    <td className="px-5 py-3 text-slate-600 dark:text-slate-400">{b.part.name}</td>
+                    <td className="px-5 py-3 text-slate-600 dark:text-slate-400">{b.quantity} {b.part.unit}</td>
                     <td className="px-5 py-3">
                       <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${STATUS_STYLES[b.status] ?? 'bg-gray-100 text-gray-700'}`}>
                         {b.status.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
                       </span>
                     </td>
-                    <td className="px-5 py-3 text-slate-400">{new Date(b.createdAt).toLocaleDateString()}</td>
+                    <td className="px-5 py-3 text-slate-400 dark:text-slate-500">{new Date(b.createdAt).toLocaleDateString()}</td>
                   </tr>
                 ))}
           </tbody>
         </table>
         {!isLoading && builds.length === 0 && (
-          <div className="text-center py-16 text-slate-400">
+          <div className="text-center py-16 text-slate-400 dark:text-slate-500">
             <Wrench className="w-10 h-10 mx-auto mb-3 opacity-30" />
             <p>No build orders yet</p>
           </div>
         )}
+        <div className="border-t border-slate-100 dark:border-slate-700">
+          <PaginationControls
+            page={page}
+            limit={limit}
+            total={total}
+            onPageChange={setPage}
+          />
+        </div>
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>

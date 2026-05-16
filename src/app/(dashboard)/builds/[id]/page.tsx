@@ -3,7 +3,7 @@
 import { use } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
-import { ArrowLeft, Wrench, Play, CheckCircle, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Wrench, Play, CheckCircle, AlertTriangle, Package, TrendingDown, Truck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -15,6 +15,14 @@ const STATUS_STYLES: Record<string, string> = {
   in_progress: 'bg-blue-100 text-blue-700',
   complete: 'bg-green-100 text-green-700',
   cancelled: 'bg-red-100 text-red-700',
+}
+
+interface BomComponent {
+  id: string
+  name: string
+  unit: string
+  stockItems: { quantity: number; location?: { name: string } }[]
+  supplierParts: { price?: number; supplier: { name: string } }[]
 }
 
 interface BuildOrder {
@@ -31,12 +39,7 @@ interface BuildOrder {
     bomItems: {
       id: string
       quantity: number
-      component: {
-        id: string
-        name: string
-        unit: string
-        stockItems: { quantity: number; location?: { name: string } }[]
-      }
+      component: BomComponent
     }[]
   }
   allocations: {
@@ -108,6 +111,22 @@ export default function BuildDetailPage({ params }: { params: Promise<{ id: stri
   const canStart = build.status === 'pending'
   const canComplete = build.status === 'in_progress'
 
+  // Forecast calculations
+  const forecastItems = bomItems.map((bom) => {
+    const required = bom.quantity * build.quantity
+    const available = bom.component.stockItems.reduce((s, si) => s + si.quantity, 0)
+    const shortfall = Math.max(0, required - available)
+    const firstPrice = bom.component.supplierParts?.[0]?.price ?? null
+    const estimatedCost = shortfall > 0 && firstPrice != null ? shortfall * firstPrice : null
+    const hasSupplier = (bom.component.supplierParts?.length ?? 0) > 0
+    return { bom, required, available, shortfall, estimatedCost, hasSupplier }
+  })
+
+  const totalComponents = forecastItems.length
+  const fullyStocked = forecastItems.filter((f) => f.shortfall === 0).length
+  const withShortfall = forecastItems.filter((f) => f.shortfall > 0).length
+  const totalProcurementCost = forecastItems.reduce((sum, f) => sum + (f.estimatedCost ?? 0), 0)
+
   return (
     <div className="p-6 space-y-5 max-w-4xl mx-auto">
       <Link href="/builds">
@@ -175,6 +194,50 @@ export default function BuildDetailPage({ params }: { params: Promise<{ id: stri
         </Card>
       )}
 
+      {/* Forecast Summary */}
+      {bomItems.length > 0 && (
+        <div className="grid grid-cols-4 gap-3">
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Package className="w-4 h-4 text-slate-400" />
+                <p className="text-xs text-slate-500 font-medium">Total Components</p>
+              </div>
+              <p className="text-2xl font-bold text-slate-900">{totalComponents}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-sm bg-green-50">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <CheckCircle className="w-4 h-4 text-green-500" />
+                <p className="text-xs text-green-700 font-medium">Fully Stocked</p>
+              </div>
+              <p className="text-2xl font-bold text-green-800">{fullyStocked}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-sm bg-red-50">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <TrendingDown className="w-4 h-4 text-red-500" />
+                <p className="text-xs text-red-700 font-medium">With Shortfall</p>
+              </div>
+              <p className="text-2xl font-bold text-red-800">{withShortfall}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-sm bg-amber-50">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Truck className="w-4 h-4 text-amber-500" />
+                <p className="text-xs text-amber-700 font-medium">Est. Procurement</p>
+              </div>
+              <p className="text-xl font-bold text-amber-800">
+                {totalProcurementCost > 0 ? `$${totalProcurementCost.toFixed(2)}` : '—'}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* BOM Requirements */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="px-5 py-3 border-b border-slate-100 bg-slate-50">
@@ -194,27 +257,46 @@ export default function BuildDetailPage({ params }: { params: Promise<{ id: stri
                 <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Component</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Required</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Available</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-40">Stock Level</th>
-            </tr>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Shortfall</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Est. Cost</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-36">Stock Level</th>
+              </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {bomItems.map((bom) => {
-                const required = bom.quantity * build.quantity
-                const available = bom.component.stockItems.reduce((s, si) => s + si.quantity, 0)
-                const pct = Math.min(100, (available / required) * 100)
+              {forecastItems.map(({ bom, required, available, shortfall, estimatedCost, hasSupplier }) => {
+                const pct = Math.min(100, required > 0 ? (available / required) * 100 : 100)
                 const hasEnough = available >= required
                 return (
                   <tr key={bom.id} className="hover:bg-slate-50">
                     <td className="px-5 py-3">
-                      <Link href={`/parts/${bom.component.id}`} className="font-medium text-slate-800 hover:text-indigo-600">
-                        {bom.component.name}
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link href={`/parts/${bom.component.id}`} className="font-medium text-slate-800 hover:text-indigo-600">
+                          {bom.component.name}
+                        </Link>
+                        {hasSupplier && (
+                          <span className="inline-flex px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Source</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-5 py-3 text-slate-600">{required} {bom.component.unit}</td>
                     <td className="px-5 py-3">
                       <span className={hasEnough ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
                         {available} {bom.component.unit}
                       </span>
+                    </td>
+                    <td className="px-5 py-3">
+                      {shortfall > 0 ? (
+                        <span className="text-red-600 font-semibold">−{shortfall} {bom.component.unit}</span>
+                      ) : (
+                        <span className="text-green-600">—</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3">
+                      {estimatedCost != null ? (
+                        <span className="text-amber-700 font-medium">${estimatedCost.toFixed(2)}</span>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
                     </td>
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2">

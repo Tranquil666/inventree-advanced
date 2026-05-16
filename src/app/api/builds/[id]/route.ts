@@ -15,7 +15,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
           bomItems: {
             include: {
               component: {
-                include: { stockItems: { include: { location: true } } },
+                include: {
+                  stockItems: { include: { location: true } },
+                  supplierParts: { include: { supplier: true }, take: 1 },
+                },
               },
             },
           },

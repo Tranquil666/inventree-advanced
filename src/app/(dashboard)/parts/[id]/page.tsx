@@ -4,7 +4,7 @@ import { useState, use } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Package, Pencil, Save, X } from 'lucide-react'
+import { ArrowLeft, Package, Pencil, Save, X, QrCode } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
+import { QRCodeModal } from '@/components/parts/QRCodeModal'
 
 interface Part {
   id: string
@@ -40,6 +41,7 @@ export default function PartDetailPage({ params }: { params: Promise<{ id: strin
   const router = useRouter()
   const qc = useQueryClient()
   const [editing, setEditing] = useState(false)
+  const [qrOpen, setQrOpen] = useState(false)
   const [form, setForm] = useState({ name: '', description: '', categoryId: 'none', unit: 'pcs', minStock: '0' })
 
   const { data: part, isLoading } = useQuery<Part>({
@@ -80,6 +82,9 @@ export default function PartDetailPage({ params }: { params: Promise<{ id: strin
     onError: () => toast.error('Failed to update'),
   })
 
+  // suppress unused router warning
+  void router
+
   const totalStock = part?.stockItems.reduce((s, i) => s + i.quantity, 0) ?? 0
 
   const statusBadge = () => {
@@ -88,6 +93,26 @@ export default function PartDetailPage({ params }: { params: Promise<{ id: strin
     if (totalStock <= part.minStock) return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Low Stock</Badge>
     return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">In Stock</Badge>
   }
+
+  // Supplier comparison calculations
+  const supplierParts = part?.supplierParts ?? []
+  const suppliersWithPrice = supplierParts.filter((sp) => sp.price != null)
+  const bestPrice = suppliersWithPrice.length > 0 ? Math.min(...suppliersWithPrice.map((sp) => sp.price!)) : null
+  const bestPriceSupplierId = suppliersWithPrice.length > 0
+    ? suppliersWithPrice.reduce((a, b) => (a.price! < b.price! ? a : b)).id
+    : null
+
+  const suppliersWithLead = supplierParts.filter((sp) => sp.leadDays != null)
+  const fastestLead = suppliersWithLead.length > 0 ? Math.min(...suppliersWithLead.map((sp) => sp.leadDays!)) : null
+  const fastestSupplierId = suppliersWithLead.length > 0
+    ? suppliersWithLead.reduce((a, b) => (a.leadDays! < b.leadDays! ? a : b)).id
+    : null
+
+  // Best value = lowest price * leadDays (weighted) - lower is better
+  const suppliersWithBoth = supplierParts.filter((sp) => sp.price != null && sp.leadDays != null)
+  const bestValueSupplierId = suppliersWithBoth.length > 0
+    ? suppliersWithBoth.reduce((a, b) => (a.price! * a.leadDays! < b.price! * b.leadDays! ? a : b)).id
+    : null
 
   if (isLoading) return (
     <div className="p-6 space-y-4">
@@ -128,9 +153,14 @@ export default function PartDetailPage({ params }: { params: Promise<{ id: strin
             </div>
           </div>
         </div>
-        <Button onClick={startEdit} variant="outline" size="sm" className="gap-2">
-          <Pencil className="w-4 h-4" /> Edit
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setQrOpen(true)} variant="outline" size="sm" className="gap-2">
+            <QrCode className="w-4 h-4" /> QR Code
+          </Button>
+          <Button onClick={startEdit} variant="outline" size="sm" className="gap-2">
+            <Pencil className="w-4 h-4" /> Edit
+          </Button>
+        </div>
       </div>
 
       {/* Edit form */}
@@ -265,7 +295,58 @@ export default function PartDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         </TabsContent>
 
-        <TabsContent value="suppliers" className="mt-4">
+        <TabsContent value="suppliers" className="mt-4 space-y-4">
+          {/* Supplier Comparison Card */}
+          {supplierParts.length > 0 && (
+            <div className="grid grid-cols-3 gap-3">
+              <Card className="border-0 shadow-sm bg-green-50">
+                <CardContent className="p-4">
+                  <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-1">Best Price</p>
+                  {bestPrice != null ? (
+                    <>
+                      <p className="text-xl font-bold text-green-800">${bestPrice.toFixed(2)}</p>
+                      <p className="text-xs text-green-600 mt-1">
+                        {supplierParts.find((sp) => sp.id === bestPriceSupplierId)?.supplier.name}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-green-600">No price data</p>
+                  )}
+                </CardContent>
+              </Card>
+              <Card className="border-0 shadow-sm bg-blue-50">
+                <CardContent className="p-4">
+                  <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-1">Fastest Delivery</p>
+                  {fastestLead != null ? (
+                    <>
+                      <p className="text-xl font-bold text-blue-800">{fastestLead} days</p>
+                      <p className="text-xs text-blue-600 mt-1">
+                        {supplierParts.find((sp) => sp.id === fastestSupplierId)?.supplier.name}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-blue-600">No lead data</p>
+                  )}
+                </CardContent>
+              </Card>
+              <Card className="border-0 shadow-sm bg-purple-50">
+                <CardContent className="p-4">
+                  <p className="text-xs font-semibold text-purple-700 uppercase tracking-wide mb-1">Best Value</p>
+                  {bestValueSupplierId != null ? (
+                    <>
+                      <p className="text-xl font-bold text-purple-800">
+                        {supplierParts.find((sp) => sp.id === bestValueSupplierId)?.supplier.name}
+                      </p>
+                      <p className="text-xs text-purple-600 mt-1">Price × lead time optimized</p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-purple-600">Insufficient data</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
           <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
             <table className="w-full text-sm">
               <thead>
@@ -274,17 +355,38 @@ export default function PartDetailPage({ params }: { params: Promise<{ id: strin
                   <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">SKU</th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Unit Price</th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Lead Days</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Badge</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {part.supplierParts.map((sp) => (
-                  <tr key={sp.id} className="hover:bg-slate-50">
-                    <td className="px-5 py-3 font-medium text-slate-800">{sp.supplier.name}</td>
-                    <td className="px-5 py-3 text-slate-500">{sp.sku ?? '—'}</td>
-                    <td className="px-5 py-3">{sp.price != null ? `$${sp.price.toFixed(2)}` : '—'}</td>
-                    <td className="px-5 py-3 text-slate-500">{sp.leadDays != null ? `${sp.leadDays} days` : '—'}</td>
-                  </tr>
-                ))}
+                {part.supplierParts.map((sp) => {
+                  const isBestPrice = sp.id === bestPriceSupplierId
+                  const isFastest = sp.id === fastestSupplierId
+                  const isBestValue = sp.id === bestValueSupplierId
+                  return (
+                    <tr key={sp.id} className={`hover:bg-slate-50 ${isBestPrice ? 'bg-green-50/50' : ''}`}>
+                      <td className="px-5 py-3 font-medium text-slate-800">{sp.supplier.name}</td>
+                      <td className="px-5 py-3 text-slate-500">{sp.sku ?? '—'}</td>
+                      <td className="px-5 py-3">
+                        <span className={isBestPrice ? 'text-green-700 font-semibold' : ''}>
+                          {sp.price != null ? `$${sp.price.toFixed(2)}` : '—'}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-slate-500">
+                        <span className={isFastest ? 'text-blue-700 font-semibold' : ''}>
+                          {sp.leadDays != null ? `${sp.leadDays} days` : '—'}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3">
+                        <div className="flex gap-1 flex-wrap">
+                          {isBestPrice && <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">Best Price</span>}
+                          {isFastest && <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Fastest</span>}
+                          {isBestValue && <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">Best Value</span>}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
             {part.supplierParts.length === 0 && (
@@ -323,6 +425,13 @@ export default function PartDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         </TabsContent>
       </Tabs>
+
+      <QRCodeModal
+        partId={part.id}
+        partName={part.name}
+        open={qrOpen}
+        onOpenChange={setQrOpen}
+      />
     </div>
   )
 }

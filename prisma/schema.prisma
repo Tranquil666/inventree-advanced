@@ -50,6 +50,7 @@ model Part {
   bomComponents BOMItem[]    @relation("BOMComponent")
   poLineItems   POLineItem[]
   buildOrders   BuildOrder[]
+  returnLineItems ReturnLineItem[]
 }
 
 model PartAttribute {
@@ -113,6 +114,7 @@ model Supplier {
 
   supplierParts   SupplierPart[]
   purchaseOrders  PurchaseOrder[]
+  returnOrders    ReturnOrder[]
 }
 
 model SupplierPart {
@@ -184,4 +186,40 @@ model BuildAllocation {
   stockItemId  String
   stockItem    StockItem  @relation(fields: [stockItemId], references: [id])
   quantity     Float
+}
+
+model ReturnOrder {
+  id         String   @id @default(cuid())
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
+  reference  String?
+  reason     String?
+  status     String   @default("pending") // pending, shipped, received, refunded
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  lineItems  ReturnLineItem[]
+}
+
+model ReturnLineItem {
+  id            String      @id @default(cuid())
+  returnOrderId String
+  returnOrder   ReturnOrder @relation(fields: [returnOrderId], references: [id], onDelete: Cascade)
+  partId        String
+  part          Part        @relation(fields: [partId], references: [id])
+  quantity      Float
+  unitPrice     Float?
+  reason        String?
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  userEmail  String?
+  action     String   // CREATE, UPDATE, DELETE
+  entity     String   // Part, Supplier, Order, Build, etc.
+  entityId   String
+  entityName String?
+  changes    String?  // JSON string of what changed
+  createdAt  DateTime @default(now())
 }

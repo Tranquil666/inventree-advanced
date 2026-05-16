@@ -6,6 +6,7 @@ import { SessionProvider } from 'next-auth/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Toaster } from '@/components/ui/sonner'
+import { ThemeProvider } from 'next-themes'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -32,14 +33,16 @@ export default function RootLayout({
   }))
 
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`} suppressHydrationWarning>
       <body className="min-h-full flex flex-col bg-background text-foreground">
-        <SessionProvider>
-          <QueryClientProvider client={queryClient}>
-            {children}
-            <Toaster />
-          </QueryClientProvider>
-        </SessionProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <SessionProvider>
+            <QueryClientProvider client={queryClient}>
+              {children}
+              <Toaster />
+            </QueryClientProvider>
+          </SessionProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

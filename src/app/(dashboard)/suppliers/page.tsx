@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import { PaginationControls } from '@/components/ui/pagination-controls'
 import { toast } from 'sonner'
 
 interface Supplier {
@@ -23,6 +24,13 @@ interface Supplier {
   _count?: { supplierParts: number; purchaseOrders: number }
 }
 
+interface SuppliersResponse {
+  data: Supplier[]
+  total: number
+  page: number
+  limit: number
+}
+
 const emptyForm = { name: '', email: '', phone: '', website: '', address: '', notes: '' }
 
 export default function SuppliersPage() {
@@ -30,11 +38,16 @@ export default function SuppliersPage() {
   const [open, setOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<Supplier | null>(null)
   const [form, setForm] = useState(emptyForm)
+  const [page, setPage] = useState(1)
+  const limit = 50
 
-  const { data: suppliers = [], isLoading } = useQuery<Supplier[]>({
-    queryKey: ['suppliers'],
-    queryFn: () => fetch('/api/suppliers').then((r) => r.json()),
+  const { data: suppliersResponse, isLoading } = useQuery<SuppliersResponse>({
+    queryKey: ['suppliers', page],
+    queryFn: () => fetch(`/api/suppliers?page=${page}&limit=${limit}`).then((r) => r.json()),
   })
+
+  const suppliers = suppliersResponse?.data ?? []
+  const total = suppliersResponse?.total ?? 0
 
   const openCreate = () => {
     setEditTarget(null)
@@ -74,40 +87,40 @@ export default function SuppliersPage() {
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Suppliers</h1>
-          <p className="text-slate-500 text-sm mt-1">{suppliers.length} suppliers</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Suppliers</h1>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">{total} suppliers</p>
         </div>
         <Button onClick={openCreate} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
           <Plus className="w-4 h-4" /> Add Supplier
         </Button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-100 bg-slate-50">
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Supplier</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Email</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Phone</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Parts</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Orders</th>
-              <th className="text-right px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>
+            <tr className="border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Supplier</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Email</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Phone</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Parts</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Orders</th>
+              <th className="text-right px-5 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-50">
+          <tbody className="divide-y divide-slate-50 dark:divide-slate-700/50">
             {isLoading
               ? [...Array(5)].map((_, i) => (
                   <tr key={i}>{[...Array(6)].map((__, j) => <td key={j} className="px-5 py-3"><Skeleton className="h-4 w-full" /></td>)}</tr>
                 ))
               : suppliers.map((s) => (
-                  <tr key={s.id} className="hover:bg-slate-50 group">
+                  <tr key={s.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 group">
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+                        <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
                           <Truck className="w-4 h-4 text-blue-500" />
                         </div>
                         <div>
-                          <Link href={`/suppliers/${s.id}`} className="font-medium text-slate-800 hover:text-indigo-600">{s.name}</Link>
+                          <Link href={`/suppliers/${s.id}`} className="font-medium text-slate-800 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400">{s.name}</Link>
                           {s.website && (
                             <a href={s.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-slate-400 hover:text-indigo-500">
                               <ExternalLink className="w-3 h-3" /> {s.website.replace(/^https?:\/\//, '')}
@@ -116,10 +129,10 @@ export default function SuppliersPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-3 text-slate-500">{s.email ?? '—'}</td>
-                    <td className="px-5 py-3 text-slate-500">{s.phone ?? '—'}</td>
-                    <td className="px-5 py-3 text-slate-600">{s._count?.supplierParts ?? 0}</td>
-                    <td className="px-5 py-3 text-slate-600">{s._count?.purchaseOrders ?? 0}</td>
+                    <td className="px-5 py-3 text-slate-500 dark:text-slate-400">{s.email ?? '—'}</td>
+                    <td className="px-5 py-3 text-slate-500 dark:text-slate-400">{s.phone ?? '—'}</td>
+                    <td className="px-5 py-3 text-slate-600 dark:text-slate-400">{s._count?.supplierParts ?? 0}</td>
+                    <td className="px-5 py-3 text-slate-600 dark:text-slate-400">{s._count?.purchaseOrders ?? 0}</td>
                     <td className="px-5 py-3 text-right">
                       <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openEdit(s)}>
@@ -139,11 +152,19 @@ export default function SuppliersPage() {
           </tbody>
         </table>
         {!isLoading && suppliers.length === 0 && (
-          <div className="text-center py-16 text-slate-400">
+          <div className="text-center py-16 text-slate-400 dark:text-slate-500">
             <Truck className="w-10 h-10 mx-auto mb-3 opacity-30" />
             <p>No suppliers yet</p>
           </div>
         )}
+        <div className="border-t border-slate-100 dark:border-slate-700">
+          <PaginationControls
+            page={page}
+            limit={limit}
+            total={total}
+            onPageChange={setPage}
+          />
+        </div>
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>

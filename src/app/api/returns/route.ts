@@ -11,14 +11,12 @@ export async function GET(req: NextRequest) {
   const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
   const limit = Math.max(1, Math.min(200, parseInt(searchParams.get('limit') || '50')))
 
-  const [total, orders] = await Promise.all([
-    prisma.purchaseOrder.count(),
-    prisma.purchaseOrder.findMany({
+  const [total, returns] = await Promise.all([
+    prisma.returnOrder.count(),
+    prisma.returnOrder.findMany({
       include: {
         supplier: true,
-        lineItems: {
-          include: { part: true },
-        },
+        lineItems: { include: { part: true } },
       },
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * limit,
@@ -26,15 +24,7 @@ export async function GET(req: NextRequest) {
     }),
   ])
 
-  return NextResponse.json({
-    data: orders.map((o) => ({
-      ...o,
-      totalValue: o.lineItems.reduce((sum, li) => sum + li.quantity * (li.unitPrice || 0), 0),
-    })),
-    total,
-    page,
-    limit,
-  })
+  return NextResponse.json({ data: returns, total, page, limit })
 }
 
 export async function POST(req: NextRequest) {
@@ -42,21 +32,23 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const { supplierId, reference, notes, lineItems } = body
+  const { supplierId, reference, reason, notes, lineItems } = body
 
   if (!supplierId) return NextResponse.json({ error: 'Supplier required' }, { status: 400 })
 
-  const order = await prisma.purchaseOrder.create({
+  const returnOrder = await prisma.returnOrder.create({
     data: {
       supplierId,
       reference,
+      reason,
       notes,
       lineItems: {
-        create: lineItems?.map((li: { partId: string; quantity: number; unitPrice?: number }) => ({
+        create: (lineItems ?? []).map((li: { partId: string; quantity: number; unitPrice?: number; reason?: string }) => ({
           partId: li.partId,
           quantity: parseFloat(String(li.quantity)),
           unitPrice: li.unitPrice ? parseFloat(String(li.unitPrice)) : null,
-        })) || [],
+          reason: li.reason,
+        })),
       },
     },
     include: {
@@ -69,10 +61,10 @@ export async function POST(req: NextRequest) {
     userId: session.user.id,
     userEmail: session.user.email ?? undefined,
     action: 'CREATE',
-    entity: 'Order',
-    entityId: order.id,
-    entityName: order.reference ?? `PO-${order.id.slice(0, 8).toUpperCase()}`,
+    entity: 'ReturnOrder',
+    entityId: returnOrder.id,
+    entityName: returnOrder.reference ?? `RMA-${returnOrder.id.slice(0, 8).toUpperCase()}`,
   })
 
-  return NextResponse.json(order, { status: 201 })
+  return NextResponse.json(returnOrder, { status: 201 })
 }
