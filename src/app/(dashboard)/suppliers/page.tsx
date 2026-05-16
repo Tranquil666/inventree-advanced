@@ -134,7 +134,7 @@ export default function SuppliersPage() {
                     <td className="px-5 py-3 text-slate-600 dark:text-slate-400">{s._count?.supplierParts ?? 0}</td>
                     <td className="px-5 py-3 text-slate-600 dark:text-slate-400">{s._count?.purchaseOrders ?? 0}</td>
                     <td className="px-5 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center justify-end gap-1 ">
                         <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openEdit(s)}>
                           <Pencil className="w-3.5 h-3.5" />
                         </Button>

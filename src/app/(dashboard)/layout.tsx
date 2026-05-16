@@ -20,6 +20,9 @@ import {
   Box,
   Sun,
   Moon,
+  RotateCcw,
+  Shield,
+  ClipboardList,
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -36,6 +39,7 @@ const navSections = [
   {
     label: 'Overview',
     items: [{ href: '/', label: 'Dashboard', icon: BarChart3 }],
+    adminOnly: false,
   },
   {
     label: 'Inventory',
@@ -45,17 +49,29 @@ const navSections = [
       { href: '/stock', label: 'Stock', icon: Layers },
       { href: '/stock/locations', label: 'Locations', icon: MapPin },
     ],
+    adminOnly: false,
   },
   {
     label: 'Procurement',
     items: [
       { href: '/suppliers', label: 'Suppliers', icon: Truck },
       { href: '/orders', label: 'Purchase Orders', icon: ShoppingCart },
+      { href: '/returns', label: 'Return Orders', icon: RotateCcw },
     ],
+    adminOnly: false,
   },
   {
     label: 'Manufacturing',
     items: [{ href: '/builds', label: 'Build Orders', icon: Wrench }],
+    adminOnly: false,
+  },
+  {
+    label: 'Admin',
+    items: [
+      { href: '/admin/users', label: 'Users', icon: Shield },
+      { href: '/admin/audit', label: 'Audit Log', icon: ClipboardList },
+    ],
+    adminOnly: true,
   },
 ]
 
@@ -119,7 +135,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Nav */}
         <nav className="flex-1 py-4 px-3">
-          {navSections.map((section) => (
+          {navSections.filter(s => !s.adminOnly || session?.user?.role === 'admin').map((section) => (
             <div key={section.label} className="mb-5">
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest px-2 mb-2">
                 {section.label}

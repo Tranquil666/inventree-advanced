@@ -89,7 +89,7 @@ export default function LocationsPage() {
           <p className="text-sm font-medium text-slate-800">{loc.name}</p>
           {loc.description && <p className="text-xs text-slate-400">{loc.description}</p>}
         </div>
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-1 ">
           <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openEdit(loc)}>
             <Pencil className="w-3.5 h-3.5" />
           </Button>

@@ -102,7 +102,7 @@ export default function CategoriesPage() {
             <ChevronRight className="w-3 h-3" /> {cat.parent.name}
           </span>
         )}
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-1 ">
           <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openEdit(cat)}>
             <Pencil className="w-3.5 h-3.5" />
           </Button>

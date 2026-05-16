@@ -216,7 +216,7 @@ export default function PartsPage() {
                       </td>
                       <td className="px-5 py-3 text-slate-500 dark:text-slate-400">{part.unit}</td>
                       <td className="px-5 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center justify-end gap-1">
                           <Button
                             size="sm"
                             variant="ghost"
