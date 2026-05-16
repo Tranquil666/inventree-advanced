@@ -35,6 +35,9 @@ export default function CategoriesPage() {
 
   const roots = categories.filter((c) => !c.parentId)
 
+  // Use flat list to find children so each child has full _count / children data
+  const getChildren = (parentId: string) => categories.filter((c) => c.parentId === parentId)
+
   const openCreate = () => {
     setEditTarget(null)
     setForm({ name: '', description: '', parentId: 'none' })
@@ -93,7 +96,7 @@ export default function CategoriesPage() {
           <p className="text-sm font-medium text-slate-800">{cat.name}</p>
           {cat.description && <p className="text-xs text-slate-400 truncate">{cat.description}</p>}
         </div>
-        <span className="text-xs text-slate-400">{cat._count.parts} part{cat._count.parts !== 1 ? 's' : ''}</span>
+        <span className="text-xs text-slate-400">{cat._count?.parts ?? 0} part{(cat._count?.parts ?? 0) !== 1 ? 's' : ''}</span>
         {cat.parent && (
           <span className="hidden sm:flex items-center gap-1 text-xs text-slate-400">
             <ChevronRight className="w-3 h-3" /> {cat.parent.name}
@@ -115,7 +118,7 @@ export default function CategoriesPage() {
           </Button>
         </div>
       </div>
-      {cat.children.map((child) => renderCategory(child, depth + 1))}
+      {getChildren(cat.id).map((child) => renderCategory(child, depth + 1))}
     </div>
   )
 
