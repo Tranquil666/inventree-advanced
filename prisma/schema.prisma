@@ -1,0 +1,186 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         String   @default("viewer") // admin, editor, viewer
+  createdAt    DateTime @default(now())
+
+  stockHistories StockHistory[]
+}
+
+model Category {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  parentId    String?
+  parent      Category?  @relation("CategoryChildren", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryChildren")
+  parts       Part[]
+  createdAt   DateTime   @default(now())
+}
+
+model Part {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  categoryId  String?
+  category    Category? @relation(fields: [categoryId], references: [id])
+  unit        String   @default("pcs")
+  minStock    Float    @default(0)
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  attributes    PartAttribute[]
+  stockItems    StockItem[]
+  stockHistories StockHistory[]
+  supplierParts SupplierPart[]
+  bomItems      BOMItem[]    @relation("BOMParent")
+  bomComponents BOMItem[]    @relation("BOMComponent")
+  poLineItems   POLineItem[]
+  buildOrders   BuildOrder[]
+}
+
+model PartAttribute {
+  id     String @id @default(cuid())
+  partId String
+  part   Part   @relation(fields: [partId], references: [id], onDelete: Cascade)
+  key    String
+  value  String
+}
+
+model Location {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  parentId    String?
+  parent      Location?  @relation("LocationChildren", fields: [parentId], references: [id])
+  children    Location[] @relation("LocationChildren")
+  stockItems  StockItem[]
+  createdAt   DateTime   @default(now())
+}
+
+model StockItem {
+  id           String   @id @default(cuid())
+  partId       String
+  part         Part     @relation(fields: [partId], references: [id], onDelete: Cascade)
+  locationId   String?
+  location     Location? @relation(fields: [locationId], references: [id])
+  quantity     Float    @default(0)
+  serialNumber String?
+  batchCode    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  histories    StockHistory[]
+  allocations  BuildAllocation[]
+}
+
+model StockHistory {
+  id          String   @id @default(cuid())
+  stockItemId String
+  stockItem   StockItem @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  partId      String
+  part        Part     @relation(fields: [partId], references: [id])
+  type        String   // ADD, REMOVE, TRANSFER, ADJUST, BUILD_USE
+  quantity    Float
+  notes       String?
+  createdAt   DateTime @default(now())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+}
+
+model Supplier {
+  id      String  @id @default(cuid())
+  name    String
+  email   String?
+  phone   String?
+  website String?
+  address String?
+  notes   String?
+  createdAt DateTime @default(now())
+
+  supplierParts   SupplierPart[]
+  purchaseOrders  PurchaseOrder[]
+}
+
+model SupplierPart {
+  id         String   @id @default(cuid())
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  partId     String
+  part       Part     @relation(fields: [partId], references: [id], onDelete: Cascade)
+  sku        String?
+  price      Float?
+  leadDays   Int?
+  packSize   Float    @default(1)
+  createdAt  DateTime @default(now())
+}
+
+model PurchaseOrder {
+  id         String   @id @default(cuid())
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
+  reference  String?
+  status     String   @default("draft") // draft, placed, received, complete, cancelled
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  lineItems  POLineItem[]
+}
+
+model POLineItem {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  partId          String
+  part            Part          @relation(fields: [partId], references: [id])
+  quantity        Float
+  unitPrice       Float?
+  received        Float         @default(0)
+  createdAt       DateTime      @default(now())
+}
+
+model BOMItem {
+  id          String  @id @default(cuid())
+  partId      String
+  part        Part    @relation("BOMParent", fields: [partId], references: [id], onDelete: Cascade)
+  componentId String
+  component   Part    @relation("BOMComponent", fields: [componentId], references: [id])
+  quantity    Float
+  notes       String?
+}
+
+model BuildOrder {
+  id        String   @id @default(cuid())
+  partId    String
+  part      Part     @relation(fields: [partId], references: [id])
+  quantity  Float
+  status    String   @default("pending") // pending, in_progress, complete, cancelled
+  reference String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  allocations BuildAllocation[]
+}
+
+model BuildAllocation {
+  id           String     @id @default(cuid())
+  buildOrderId String
+  buildOrder   BuildOrder @relation(fields: [buildOrderId], references: [id], onDelete: Cascade)
+  stockItemId  String
+  stockItem    StockItem  @relation(fields: [stockItemId], references: [id])
+  quantity     Float
+}
